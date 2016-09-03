@@ -4,13 +4,15 @@ function mat2np(m, file, dtype)
 %  mat2pkl(m, file, dtype) saves a 1-d or 2-d array and into a pickled 
 %    numpy array named 'file' in specified dtype. 
 %  
-%  Currently, only dypte 'int32' and 'float64' are supported.
+%  Currently, only dypte 'int8', 'int16', 'int32' and 'float64' are 
+%  supported.
 %
 % Copyright, Chao-Yuan Yeh, 2016
 %
 
 fout = fopen(file, 'wb');
-% structure : headbytes + shapebytes + byte_after_shape + dtypebytes +
+% *consult pickle.py source file for file structure.
+% File structure : headbytes + shapebytes + byte_after_shape + dtypebytes +
 % byte_after_dtype + dsizebyte + data + tailbyte
 
 headbytes = [128 3 99 110 117 109 112 121 46 99 111 114 101 46 109 117 ...
@@ -54,32 +56,29 @@ end
 byte_after_shape = [113 6 99 110 117 109 112 121 10 100 116 121 112 101 ...
      10 113 7 88 2 0 0 0];
 fwrite(fout, byte_after_shape, 'uint8');
- 
-switch dtype
-    case 'int32'
-        dtypebytes = [105 52];  % char([105 52]) = 'i4'
-    case 'float64'
-        dtypebytes = [102 56];  % char([102 56]) = 'f8'
-end 
 
+dtype_type = regexpi(dtype, '\D*', 'match');
+dtype_type = dtype_type{1};
+dtype_size = str2double(regexp(dtype, '\d*', 'match'))/8;
+
+if strfind(dtype_type, 'i')
+    if strfind(dtype_type, 'u')
+        dtype_type = 'u' + 0; % cast it into integer type
+    else
+        dtype_type = 'i' + 0;
+    end
+elseif strfind(dtype_type, 'f')
+    dtype_type = 'f' + 0;
+end
 
 bytes_after_dtype = [113 8 75 0 75 1 135 113 9 82 113 10 40 75 3 88 1 0 0 ...
     0 60 113 11 78 78 78 74 255 255 255 255 74 255 255 255 255 75 0 116 ...
     113 12 98 137];
 
-fwrite(fout, [dtypebytes, bytes_after_dtype], 'uint8');
+fwrite(fout, [dtype_type, num2str(dtype_size) + 0, ...
+    bytes_after_dtype], 'uint8');
 
-%  b148 marks total datasize for one element with int 32, this
-%  is 4, for two element with int32, this is 8, for 4 elements, 16. 
-
-
-dsizebytes = size(m, 1) * size(m, 2);
-switch dtype
-    case 'int32'
-        dsizebytes = dsizebytes * 4;
-    case 'float64'
-        dsizebytes = dsizebytes * 8;
-end
+dsizebytes = size(m, 1) * size(m, 2) * dtype_size ;
 
 if dsizebytes < 2^8
     fwrite(fout, [67 dsizebytes], 'uint8');
@@ -98,8 +97,8 @@ end
 data = m';
 
 switch dtype
-    case 'int32'
-        fwrite(fout, data(:), 'int32', 'l');
+    case {'int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32'}
+        fwrite(fout, data(:), dtype, 'l');
     case 'float64'
         fwrite(fout, data(:), 'float64', 'a');
 end
