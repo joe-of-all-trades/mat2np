@@ -83,7 +83,7 @@ dsizebytes = size(m, 1) * size(m, 2) * dtype_size ;
 if dsizebytes < 2^8
     fwrite(fout, [67 dsizebytes], 'uint8');
 else
-    fwrite(fout, 66, 'uint8')
+    fwrite(fout, 66, 'uint8');
     if dsizebytes < 2^16
         fwrite(fout, dsizebytes, 'uint16', 'l');
     elseif dsizebytes < 2^32
